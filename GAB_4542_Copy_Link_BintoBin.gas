@@ -1,0 +1,141 @@
+Program.Sub.ScreenSU.Start
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+
+'mod 07/19/16 RRC
+
+F.Intrinsic.Control.If(V.Passed.000005,!=,"")
+	F.Intrinsic.Control.CallSub(Subbdfproc)
+F.Intrinsic.Control.EndIf
+
+
+
+Program.Sub.Main.End
+
+Program.Sub.subBDFProc.Start
+F.Intrinsic.Control.SetErrorHandler("subBDFProc_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+
+V.Local.iC.Declare(Long)
+V.Local.iC2.Declare(Long,1)
+V.Local.iRowCount.Declare(Long)
+V.Local.iColCount.Declare(Long)
+V.Local.sPart.Declare(String)
+V.Local.sRev.Declare(String)
+V.Local.sFromLoc.Declare(String)
+V.Local.sLot.Declare(String)
+V.Local.sFromBIN.Declare(String)
+V.Local.sHeat.Declare(String)
+V.Local.sSerial.Declare(String)
+V.Local.sToLoc.Declare(String)
+V.Local.sToBIN.Declare(String)
+V.Local.sSel.Declare(String)
+V.Local.sInvQty.Declare(String)
+V.Local.sInvTrf.Declare(String)
+V.Local.sIDLink.Declare(String)
+V.Local.iIDLink.Declare(Long)
+V.Local.sIDLink2.Declare(String)
+V.Local.iIDLink2.Declare(Long)
+V.Local.sMessage.Declare(String)
+V.Local.sSql.Declare(String)
+V.Local.sSql2.Declare(String)
+V.Local.sDccExists.Declare(String)
+V.Local.iFileNumdcc.Declare(Long)
+V.Local.sFiledcc.Declare(String)
+F.Intrinsic.String.GSSPartString(V.Passed.000005,V.Passed.000006,V.Local.sPart)
+V.Local.sFromLoc.Set(V.Passed.000008)
+V.Local.sToLoc.Set(V.Passed.000011)
+V.Local.sToBIN.Set(V.Passed.000012)
+V.Local.sTest.Declare(String)
+
+
+' Get BDF data
+F.Intrinsic.BDF.Load("AUX001","AUX001")
+F.Intrinsic.BDF.Clone("AUX001","Clone")
+F.Intrinsic.BDF.ReadRowCount("AUX001",V.Local.iRowCount)
+F.Intrinsic.Math.Sub(V.Local.iRowCount,1,V.Local.iRowCount)
+F.Intrinsic.BDF.ReadColumnCount("AUX001",V.Local.iColCount)
+F.odbc.Connection!conx.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass)
+'Move in the BDF
+F.Intrinsic.Control.For(V.Local.iC,0,V.Local.iRowCount,1)
+	F.Intrinsic.BDF.TextMatrix("AUX001",0,V.Local.iC,V.Local.sSel)
+	F.Intrinsic.BDF.TextMatrix("AUX001",1,V.Local.iC,V.Local.sFromBIN)
+	F.Intrinsic.BDF.TextMatrix("AUX001",2,V.Local.iC,V.Local.sLot)
+	F.Intrinsic.BDF.TextMatrix("AUX001",3,V.Local.iC,V.Local.sHeat)
+	F.Intrinsic.BDF.TextMatrix("AUX001",4,V.Local.iC,V.Local.sSerial)
+	F.Intrinsic.BDF.TextMatrix("AUX001",5,V.Local.iC,V.Local.sInvQty)
+	F.Intrinsic.BDF.TextMatrix("AUX001",6,V.Local.iC,V.Local.sInvTrf)
+' Process if the Grid has Selected Checked
+	F.Intrinsic.Control.If(V.Local.sSel,=,"Y")
+		F.Intrinsic.String.Concat(V.Local.sSel," - ",V.Local.sFromBin," - ",V.Local.sLot," - ",V.Local.sHeat," - ",V.Local.sSerial," - ",V.Local.sInvQty," - ",V.Local.sInvTrf,V.Local.sMessage)
+		F.Intrinsic.String.RPad(V.Local.sPart," ",20,V.Local.sPart)
+		F.Intrinsic.String.RPad(V.Local.sFromLoc," ",2,V.Local.sFromLoc)
+		F.Intrinsic.String.RPad(V.Local.sLot," ",15,V.Local.sLot)
+		F.Intrinsic.String.RPad(V.Local.sFromBIN," ",6,V.Local.sFromBIN)
+		F.Intrinsic.String.RPad(V.Local.sHeat," ",15,V.Local.sHeat)
+		F.Intrinsic.String.RPad(V.Local.sSerial," ",30,V.Local.sSerial)
+		F.Intrinsic.String.RPad(V.Local.sToLoc," ",2,V.Local.sToLoc)
+		F.Intrinsic.String.RPad(V.Local.sToBIN," ",6,V.Local.sToBIN)
+		F.Intrinsic.String.Concat(V.Local.sPart,V.Local.sFromLoc,V.Local.sLot,V.Local.sFromBIN,V.Local.sHeat,V.Local.sSerial,V.Local.sIDlink)
+
+		F.Global.DocumentControl.GetLinkID(V.Local.sIDLink,31,V.Local.iIDLink)
+		F.Intrinsic.String.Concat("Select FILE_NUM, FILE from ATG_DOC_ASSOC Where LINK_ID='",V.Local.iIDLink,"'",V.Local.sSQL)
+		F.ODBC.Connection!conx.OpenRecordsetRO("rstLFile",V.Local.sSQL)
+		F.Intrinsic.Control.DoUntil(V.ODBC.conx!rstLFile.EOF,=,"True")
+			V.Local.iFileNumdcc.Set(V.ODBC.conx!rstLFile.FieldVal!FILE_NUM)
+			F.Intrinsic.String.Trim(V.ODBC.conx!rstLFile.FieldVal!FILE,V.Local.sFiledcc)
+' Check and/or create Link ID for To Bin
+			F.Intrinsic.String.Concat(V.Local.sPart,V.Local.sToLoc,V.Local.sLot,V.Local.sToBIN,V.Local.sHeat,V.Local.sSerial,V.Local.sIDlink2)
+			F.Global.DocumentControl.GetLinkID(V.Local.sIDLink2,31,V.Local.iIDLink2)
+			F.Intrinsic.Control.If(V.Local.iIDLink2,<,1)
+				F.Global.DocumentControl.CreateReference(V.Local.sIDLink2,31,V.Local.iIDLink2)
+			F.Intrinsic.Control.Endif
+' Get DocumentID, checks if the file exists in the To Bin
+			F.Global.DocumentControl.GetDocumentID(V.Local.iIDLink2,V.Local.sFiledcc,V.Local.sDccExists)
+			F.Intrinsic.Control.If(V.Local.sDccExists,=,"")
+'Add DCC to To Part/Bin using SQL
+				V.Local.sSql2.Set("INSERT INTO ATG_DOC_ASSOC (LINK_ID, FILE_TYPE, PATH, FILE, DESCRIPTION, DATE_ADDED, GS_USER, GRP_ID, INFO_1, INFO_2, STATUS, REV, INV_NON_REV)")
+				F.Intrinsic.String.Concat(V.Local.sSql2," SELECT '",V.Local.iIDLink2,"' , FILE_TYPE, PATH, FILE, DESCRIPTION, DATE_ADDED, GS_USER, GRP_ID, INFO_1, INFO_2, STATUS, REV, INV_NON_REV",V.Local.sSql2)
+				F.Intrinsic.String.Concat(V.Local.sSql2," FROM ATG_DOC_ASSOC WHERE FILE_NUM='",V.Local.iFileNumdcc,"'",V.Local.sSql2)
+				F.ODBC.Connection!conx.Execute(V.Local.sSql2)
+			F.Intrinsic.Control.endif
+'Delete Previous DCC if its transfers all units
+'			F.Intrinsic.Control.If(V.Local.sInvQty,=,V.Local.sInvTrf)
+'				F.Global.DocumentControl.DeleteDocument(V.Local.iFileNumdcc)
+'			F.Intrinsic.Control.EndIf
+
+			F.ODBC.conx!rstLFile.MoveNext
+		F.Intrinsic.Control.Loop
+		F.ODBC.conx!rstLFile.Close
+
+	F.Intrinsic.Control.EndIf
+	F.Intrinsic.Math.Add(V.Local.iC2,1,V.Local.iC2)
+F.Intrinsic.Control.Next(V.Local.iC)
+F.Intrinsic.Control.End
+F.ODBC.Connection!conx.Close
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("subBDFProc_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GAB_INV_TRF_LKCP_Var1.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.Debug.SetLA(V.Local.sError)
+Function.Intrinsic.Control.EndIf
+
+Program.Sub.subBDFProc.End
+
+Program.Sub.Comments.Start
+${$0$}$GAB_INV_TRF_LKCP_Var1$}$RRODRIGUEZ$}$6/14/2013
+${$1$}$$}$$}$0$}$28072$}$IMS054-POST-OK-HOOK$}$6/14/2013 2:00:25 PM$}$(Program: LOT054GI?; Screen: IMS054)
+
+${$3$}$0$}$$}$0$}$-1$}$$}$12:00:00 AM$}$Inventory Transfers, copies DCC from source Part LBH to the target Part LBH
+${$4$}$0$}$$}$0$}$-1$}$RR$}$3/12/2014 12:30:59 PM$}$Removed the link delete process
+Program.Sub.Comments.End
+
