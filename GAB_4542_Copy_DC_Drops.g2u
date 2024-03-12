@@ -1,0 +1,156 @@
+Program.Sub.Preflight.Start
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+	F.Intrinsic.Control.Try
+	V.Local.sError.Declare
+
+'Hooks: 28840-JBS0075A, 29650-JBS0076A and 29631-JBS0076A
+
+F.Intrinsic.Control.SelectCase(V.Caller.Hook)
+	F.Intrinsic.Control.Case(28842)
+		'Main Issue Material Screen
+		F.ODBC.Connection!con.OpenCompanyConnection(300)
+		F.Intrinsic.Control.CallSub(checkparts)
+		F.ODBC.Connection!con.Close
+	F.Intrinsic.Control.Case(29650)
+		'Drop Screen for Issue Material
+		F.Intrinsic.Control.CallSub(createdrops,"First",True)
+	F.Intrinsic.Control.Case(29631)
+		'Drop Screen for Issue Material
+		F.Intrinsic.Control.CallSub(createdrops,"First",False)
+F.Intrinsic.Control.EndSelect
+	
+	F.Intrinsic.Control.Catch
+		F.Intrinsic.String.Build("Project: GAB_4542_Copy_DC_Drops.g2u{0}{0}Subroutine: {1}{0}Error Occurred {2} with description {3}.",V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Local.sError)
+		F.Intrinsic.UI.Msgbox(V.Local.sError)
+		F.Intrinsic.Control.End 
+	F.Intrinsic.Control.EndTry
+Program.Sub.Main.End
+
+Program.Sub.CreateDrops.Start
+	F.Intrinsic.Control.Try
+	V.Local.sError.Declare
+	
+	V.Local.sXML.Declare
+	V.Local.bExists.Declare
+	V.Local.sPartDropSuf.Declare
+	V.Local.sPart.Declare
+	V.Local.iRet.Declare	
+
+'***********************************************************************************************************ID 000033 Needs to be updated to be unique - Hooks 29630 and 29631
+	F.Intrinsic.String.Build("{0}\GAB_4542_{1}.xml",V.Caller.LocalGSSTempDir,V.Caller.Terminal,V.Local.sXML)
+	F.Intrinsic.File.Exists(V.Local.sXML,V.Local.bExists)
+	F.Intrinsic.Control.If(V.Local.bExists)
+		F.Data.DataTable.CreateFromXML("dtDrops",V.Local.sXML,True)
+	F.Intrinsic.Control.Else
+		F.Data.DataTable.Create("dtDrops")
+		F.Data.DataTable.AddColumn("dtDrops","DropSuffix",String)
+		F.Data.DataTable.AddColumn("dtDrops","PartDropSuffix",String)
+		F.Data.DataTable.AddColumn("dtDrops","Part",String)
+		F.Data.DataTable.AddColumn("dtDrops","Loc",String)
+		F.Data.DataTable.AddColumn("dtDrops","Qty",String)
+	F.Intrinsic.Control.EndIf
+
+	F.Intrinsic.Control.If(V.Args.First)
+		F.Intrinsic.String.Instr(V.Passed.000004,V.Passed.000002,0,V.Local.iRet)
+		F.Intrinsic.String.Left(V.Passed.000004,V.Local.iRet.--,V.Local.sPart)
+		F.Data.DataTable.AddRow("dtDrops","Part",V.Local.sPart,"Loc",V.Passed.000006)
+	F.Intrinsic.Control.Else
+		F.Data.DataTable.SetValue("dtDrops",V.DataTable.dtDrops.RowCount--,"DropSuffix",V.Passed.000002,"PartDropSuffix",V.Passed.000004,"Qty",V.Passed.000010)
+	F.Intrinsic.Control.EndIf
+
+	F.Data.DataTable.SaveToXML("dtDrops",0,True,V.Local.sXML)
+	
+	F.Intrinsic.Control.Catch
+		F.Intrinsic.String.Build("Project: GAB_4542_Copy_DC_Drops.g2u{0}{0}Subroutine: {1}{0}Error Occurred {2} with description {3}.",V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Local.sError)
+		F.Intrinsic.UI.Msgbox(V.Local.sError)
+		F.Intrinsic.Control.End 
+	F.Intrinsic.Control.EndTry
+Program.Sub.CreateDrops.End
+
+Program.Sub.CheckParts.Start
+	F.Intrinsic.Control.Try
+	V.Local.sError.Declare
+
+	V.Local.sXML.Declare
+	V.Local.bExists.Declare
+	V.Local.iCnt.Declare
+	V.Local.sSql.Declare
+	V.Local.sLotBin.Declare
+	V.Local.sKeyOld.Declare
+	V.Local.sKeyNew.Declare
+	V.Local.iLinkIDOld.Declare
+	V.Local.iLinkIDNew.Declare
+	V.Local.bCopy.Declare
+	V.Local.sPart.Declare
+	V.Local.sPartDropSuffix.Declare
+	V.Local.sLoc.Declare
+	V.Local.sLot.Declare
+	V.Local.sBin.Declare
+	V.Local.sHeat.Declare
+	V.Local.sSerial.Declare
+
+	F.Intrinsic.String.Build("{0}\GAB_4542_{1}.xml",V.Caller.LocalGSSTempDir,V.Caller.Terminal,V.Local.sXML)
+	F.Intrinsic.File.Exists(V.Local.sXML,V.Local.bExists)
+	F.Intrinsic.Control.If(V.Local.bExists)
+		F.Data.DataTable.CreateFromXML("dtDrops",V.Local.sXML,True)
+		F.Intrinsic.Control.For(V.Local.iCnt,0,V.DataTable.dtDrops.RowCount--,1)
+			F.Intrinsic.String.Build("Select Lot,Bin,Heat,Serial_Number From V_Item_Master Where Part = '{0}' And Location = '{1}';",V.DataTable.dtDrops(V.Local.iCnt).PartDropSuffix!FieldValTrim,V.DataTable.dtDrops(V.Local.iCnt).Loc!FieldValTrim,V.Local.sSql)
+			F.ODBC.Connection!con.ExecuteAndReturn(V.Local.sSql,V.Local.sLotBin)
+			F.Intrinsic.String.Split(V.Local.sLotBin,"*!*",V.Local.sLotBin)
+			'Set Part
+			F.Intrinsic.String.RPad(V.DataTable.dtDrops(V.Local.iCnt).Part!FieldValTrim," ",20,V.Local.sPart)
+			F.Intrinsic.String.RPad(V.DataTable.dtDrops(V.Local.iCnt).PartDropSuffix!FieldValTrim," ",20,V.Local.sPartDropSuffix)
+			'Set Location
+			F.Intrinsic.String.RPad(V.DataTable.dtDrops(V.Local.iCnt).Loc!FieldValTrim," ",2,V.Local.sLoc)
+			'Set Lot
+			F.Intrinsic.Control.If(V.Local.sLotBin(0),=,"OOB")
+				F.Intrinsic.String.RPad(""," ",15,V.Local.sLot)
+			F.Intrinsic.Control.Else
+				F.Intrinsic.String.RPad(V.Local.sLotBin(0)," ",15,V.Local.sLot)
+			F.Intrinsic.Control.EndIf
+			'Set Bin
+			F.Intrinsic.Control.If(V.Local.sLotBin(0),=,"OOB")
+				F.Intrinsic.String.RPad(""," ",6,V.Local.sBin)
+			F.Intrinsic.Control.Else
+				F.Intrinsic.String.RPad(V.Local.sLotBin(1)," ",6,V.Local.sBin)
+			F.Intrinsic.Control.EndIf
+			'Set Heat
+			F.Intrinsic.Control.If(V.Local.sLotBin(0),=,"OOB")
+				F.Intrinsic.String.RPad(""," ",15,V.Local.sHeat)
+			F.Intrinsic.Control.Else
+				F.Intrinsic.String.RPad(V.Local.sLotBin(2)," ",15,V.Local.sHeat)
+			F.Intrinsic.Control.EndIf
+			'Set Serial
+			F.Intrinsic.Control.If(V.Local.sLotBin(0),=,"OOB")
+				F.Intrinsic.String.RPad(""," ",30,V.Local.sSerial)
+			F.Intrinsic.Control.Else
+				F.Intrinsic.String.RPad(V.Local.sLotBin(3)," ",30,V.Local.sSerial)
+			F.Intrinsic.Control.EndIf
+			F.Intrinsic.String.Build("{0}{1}{2}{3}{4}{5}",V.Local.sPart,V.Local.sLoc,V.Local.sLot,V.Local.sBin,V.Local.sHeat,V.Local.sSerial,V.Local.sKeyOld)
+			F.Intrinsic.String.Build("{0}{1}{2}{3}{4}{5}",V.Local.sPartDropSuffix,V.Local.sLoc,V.Local.sLot,V.Local.sBin,V.Local.sHeat,V.Local.sSerial,V.Local.sKeyNew)
+			F.Global.DocumentControl.GetLinkID(V.Local.sKeyOld,00031,V.Local.iLinkIDOld)
+			F.Intrinsic.Control.If(V.Local.iLinkIDOld,<>,-1)
+				'Check New Link Key
+				F.Global.DocumentControl.GetLinkID(V.Local.sKeyNew,00031,V.Local.iLinkIDNew)
+				F.Intrinsic.Control.If(V.Local.iLinkIDNew,=,-1)
+					F.Global.DocumentControl.CreateReference(V.Local.sKeyNew,00031,V.Local.iLinkIDNew)
+				F.Intrinsic.Control.EndIf
+				'Copy Link
+				F.Global.DocumentControl.Copy(V.Local.iLinkIDOld,V.Local.iLinkIDNew,V.Local.bCopy)
+			F.Intrinsic.Control.EndIf
+		F.Intrinsic.Control.Next(V.Local.iCnt)
+		F.Intrinsic.File.DeleteFile(V.Local.sXML)
+	F.Intrinsic.Control.EndIf
+	
+	F.Intrinsic.Control.Catch
+		F.Intrinsic.String.Build("Project: GAB_4542_Copy_DC_Drops.g2u{0}{0}Subroutine: {1}{0}Error Occurred {2} with description {3}.",V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Local.sError)
+		F.Intrinsic.UI.Msgbox(V.Local.sError)
+		F.Intrinsic.Control.End 
+	F.Intrinsic.Control.EndTry
+Program.Sub.CheckParts.End
+
+Program.Sub.Comments.Start
+${$0$}$GAB_4542_Copy_DC_Drops$}$AGV$}$04/18/2017 1:33:29 PM$}$False
+Program.Sub.Comments.End
